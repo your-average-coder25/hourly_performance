@@ -20,7 +20,8 @@ import re
 import numpy as np
 import datetime
 
-
+#variables that are hidden so they aren't accidentally pushed into github
+#variables are all called using os.environ[variableName]
 dotenv_path = Path('local.env')
 load_dotenv(dotenv_path=dotenv_path)
 
@@ -33,6 +34,7 @@ folder = os.path.dirname(chrome_install)
 chromedriver_path = os.path.join(folder, PATH)
 
 options = webdriver.ChromeOptions()
+#Mainly used to reduce some messages on command line so it isn't as cluttered
 options.add_argument('--ignore-certificate-errors')
 options.add_argument('--ignore-ssl-errors')
 options.add_argument("--disable-proxy-certificate-handler")
@@ -40,7 +42,6 @@ options.add_argument("--disable-proxy-certificate-handler")
 driver = webdriver.Chrome(service=ChromeService(chromedriver_path),options=options)
 
 lightspeedLoginURL = "https://manager.lsk.lightspeed.app/"
-print("Here 2")
 driver.get(lightspeedLoginURL)
 
 usernameTextBox = driver.find_element(By.XPATH,'//*[@id="username"]')
@@ -54,9 +55,7 @@ usernameTextBox.send_keys(os.environ["LIGHTSPEED_USERNAME"])
 pwTextBox.send_keys(os.environ["LIGHTSPEED_PASSWORD"])
 loginButton.click()
 #YYYY-MM-DD
-#startDate="2023-06-05"
-#endDate="2023-12-10"
-startDate="2023-03-06"
+startDate="2024-07-08"
 endDate="2024-07-14"
 
 dateFormat = "%Y-%m-%d"
@@ -65,13 +64,14 @@ endDateTime = datetime.datetime.strptime(endDate, dateFormat).date()
 week = 7 
 d1 = startDateTime
 datePairs = []
+# Getting date range into Monday to Sunday pairs
+# The heatmap starts on monday and ends on Sunday so ideally the date range starts on a monday and ends on a sunday
+# Otherwise the pairs will not be correct
 while d1 < endDateTime:
     datePairs.append((d1, d1 + datetime.timedelta(week-1)))
     d1 += datetime.timedelta(week)
 
-#print(datePairs)
-
-print("Here 3")
+print("Pairs Calculated")
 
 
 headerRow = ("Date", "Day", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", 
@@ -82,32 +82,25 @@ csvFile = pandas.DataFrame(data=None,columns=headerRow)
 
 for startOfWeek,endOfWeek in datePairs:
 
-    print(startOfWeek)
-    #driver.get(f'https://manager.lsk.lightspeed.app/reporting/heatmap/week/{startDate}/{endDate}')
+    print("Start Date: " + startOfWeek.strftime(dateFormat))
+    print("End Date: " + endOfWeek.strftime(dateFormat))
     driver.get(f"https://manager.lsk.lightspeed.app/reporting/heatmap/week/{startOfWeek.strftime('%Y-%m-%d')}/{endOfWeek.strftime('%Y-%m-%d')}")
     heatmapID = "heatmap"
-    print("Here 4")
     time.sleep(3)
-    #wait = input("Wait for input")
+    print("Heatmap Loaded")
+
     #Its not really a table but its presented like a table
     table = driver.find_element(By.ID, heatmapID)
     #data is just one large array
     data = table.find_elements(By.XPATH, ".//div")
-    print("Here 5")
+    print("Retreived performance")
     print(len(data))
 
-    print(data[392].get_attribute("class"))
+    #Reshaped into rows where each row is a separate day
     rows = np.reshape(data[0:len(data)-1],(8,49))
 
-    # headerRow = ("Date", "Day", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", 
-                # "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30", 
-                # "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00")
-    # print(len(headerRow))
-    # csvFile = pandas.DataFrame(data=None,columns=headerRow)
-
-    #for i in rows[0]:
-    #    print(f'{i.text}:{i.get_attribute("class")}')
     currentDay = startOfWeek
+    #Retrieving the days hourly performance and inserting into dataframe
     for row in rows[1:]:
         rowData = [None] * len(row)
         #rowData[0] = currentDay.strftime('%Y-%m-%d')
@@ -121,7 +114,8 @@ for startOfWeek,endOfWeek in datePairs:
         csvFile.loc[len(csvFile)] = rowData
         
 
-csvFile.to_csv('output2.csv', sep=',')
+csvFile.to_csv('hourly_performance_' + startDate + '_to_' + endDate + '.csv', sep=',')
 
+#Waits for user to close command line window so it doesn't close on its own and you can review the current state of the browser
 wait = input("Wait for input")  
    
